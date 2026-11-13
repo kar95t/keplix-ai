@@ -218,3 +218,19 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Keplix AI local state & telemetry artifacts
+.keplix/
+*.db
+*.sqlite
+*.sqlite3
+trace.json
+graph.json
+keplix.toml
+!keplix.toml.example
+
+# Next.js web_replayer build artifacts
+web_replayer/.next/
+web_replayer/out/
+web_replayer/node_modules/
+
