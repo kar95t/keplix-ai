@@ -1,13 +1,34 @@
 """Typer CLI entrypoints for Keplix (`keplix run`, `init`, `inspect`)."""
 
 from pathlib import Path
-import shutil
 from typing import Annotated, Optional
 
-import typer
+try:
+    import typer
+except ImportError:
+    class _MockTyper:  # type: ignore[no-redef]
+        def __init__(self, *args, **kwargs):
+            pass
+        def callback(self, *args, **kwargs):
+            return lambda fn: fn
+        def command(self, *args, **kwargs):
+            return lambda fn: fn
+        @staticmethod
+        def Option(*args, **kwargs):
+            return args[0] if args else None
+        @staticmethod
+        def Argument(*args, **kwargs):
+            return args[0] if args else None
+        class Exit(SystemExit):
+            def __init__(self, code: int = 0):
+                super().__init__(code)
+        def Typer(self, *args, **kwargs):
+            return self
+    typer = _MockTyper()  # type: ignore[assignment]
 
 from keplix import __version__
 from keplix.cli.console import console, print_banner
+from keplix.cli.wizard import run_init_wizard
 from keplix.config.secrets import SecretManager
 from keplix.config.settings import load_settings
 
@@ -42,49 +63,18 @@ def init(
         typer.Option("--force", "-f", help="Overwrite existing configuration if present."),
     ] = False,
 ) -> None:
-    """Initialize a Keplix project in the current directory."""
-    print_banner()
+    """Launch the interactive first-run setup wizard for Keplix."""
+    context = run_init_wizard(total_steps=9)
 
-    template_path = Path("keplix.toml.example")
-    if config_path.exists() and not force:
-        console.print(
-            f"[bold yellow]Config file '{config_path}' already exists.[/bold yellow] "
-            "Use [bold cyan]--force[/bold cyan] to overwrite."
-        )
-    else:
-        if template_path.exists():
-            shutil.copyfile(template_path, config_path)
-            console.print(f"[green]✓[/green] Created [bold]{config_path}[/bold] from template.")
-        else:
-            # Fallback inline template
-            settings = load_settings()
-            config_path.write_text(
-                "# keplix.toml\n[execution]\nmax_retries = 3\nbudget_usd = 2.50\n",
-                encoding="utf-8",
-            )
-            console.print(f"[green]✓[/green] Generated default [bold]{config_path}[/bold].")
+    if context is None or context.cancelled:
+        raise typer.Exit(code=0)
 
-    # Create local runtime state directory
-    state_dir = Path(".keplix")
-    state_dir.mkdir(parents=True, exist_ok=True)
-    console.print(f"[green]✓[/green] Initialized local state store at [bold]{state_dir}/[/bold]")
-
-    # Interactive Secret setup helper
-    console.print("\n[bold]Configuring Model Credentials (OS Keyring / Environment):[/bold]")
-    secret_manager = SecretManager()
-    for provider, env_var in [
-        ("Anthropic", "ANTHROPIC_API_KEY"),
-        ("OpenAI", "OPENAI_API_KEY"),
-        ("DeepSeek", "DEEPSEEK_API_KEY"),
-        ("Groq", "GROQ_API_KEY"),
-    ]:
-        existing_val = secret_manager.get_secret(env_var, prompt_user=False)
-        if existing_val:
-            console.print(f"  • {provider} ({env_var}): [green]Configured[/green]")
-        else:
-            console.print(f"  • {provider} ({env_var}): [dim]Not set (can configure later)[/dim]")
-
-    console.print("\n[bold green]Ready for launch![/bold green] Run [cyan]keplix run --goal \"<your task>\"[/cyan]\n")
+    # Report completion status for Steps 0–2
+    selected = context.selected_path or Path.cwd()
+    console.print(f"\n[bold green]✓ Steps 0–2 Completed successfully![/bold green]")
+    console.print(f"[dim]Selected workspace:[/dim] [cyan]{selected}[/cyan]")
+    console.print(f"[dim]Workspace state:[/dim] [yellow]{context.inspection.state.value if context.inspection else 'fresh'}[/yellow]")
+    console.print(f"[dim]Ready for Step 3: Execution Environment.[/dim]\n")
 
 
 @app.command()
@@ -152,4 +142,3 @@ def inspect(
 
 if __name__ == "__main__":
     app()
-

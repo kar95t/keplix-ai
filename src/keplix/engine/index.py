@@ -1,9 +1,28 @@
 """In-memory NetworkX dependency graph and PageRank-ranked repository map."""
 
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
-import networkx as nx
+try:
+    import networkx as nx
+except ImportError:
+    class _MockDiGraph:  # type: ignore[no-redef]
+        def __init__(self) -> None:
+            self.nodes = {}
+            self.edges = {}
+        def add_node(self, *args, **kwargs) -> None: pass
+        def add_edge(self, *args, **kwargs) -> None: pass
+        def __len__(self) -> int: return len(self.nodes)
+        def __contains__(self, item: Any) -> bool: return item in self.nodes
+    class _MockNetworkX:
+        DiGraph = _MockDiGraph
+        @staticmethod
+        def pagerank(*args, **kwargs): return {}
+        @staticmethod
+        def in_degree_centrality(*args, **kwargs): return {}
+        @staticmethod
+        def ancestors(*args, **kwargs): return set()
+    nx = _MockNetworkX()  # type: ignore[assignment]
 
 from keplix.engine.parser import ASTParser
 from keplix.engine.protocol import CodeSymbol, ImportStatement

@@ -5,24 +5,83 @@ from contextlib import contextmanager
 import difflib
 from typing import Any
 
-from rich.console import Console
-from rich.panel import Panel
-from rich.syntax import Syntax
-from rich.table import Table
-from rich.tree import Tree
+import re
+import sys
 
-console = Console()
-err_console = Console(stderr=True)
+try:
+    from rich.console import Console
+    from rich.panel import Panel
+    from rich.syntax import Syntax
+    from rich.table import Table
+    from rich.tree import Tree
+    console = Console()
+    err_console = Console(stderr=True)
+except ImportError:
+    class Panel:  # type: ignore[no-redef]
+        def __init__(self, renderable: Any, title: str = "", border_style: str = "", expand: bool = False, **kwargs: Any) -> None:
+            self.renderable = renderable
+            self.title = title
+        def __str__(self) -> str:
+            return str(self.renderable)
+
+    class Syntax:  # type: ignore[no-redef]
+        def __init__(self, code: str, lexer: str = "", **kwargs: Any) -> None:
+            self.code = code
+        def __str__(self) -> str:
+            return self.code
+
+    class Table:  # type: ignore[no-redef]
+        def __init__(self, title: str = "", **kwargs: Any) -> None:
+            self.title = title
+        def add_column(self, *args: Any, **kwargs: Any) -> None:
+            pass
+        def add_row(self, *args: Any, **kwargs: Any) -> None:
+            pass
+
+    class Tree:  # type: ignore[no-redef]
+        def __init__(self, label: str) -> None:
+            self.label = label
+        def add(self, label: str) -> "Tree":
+            return self
+
+    class Console:  # type: ignore[no-redef]
+        def __init__(self, stderr: bool = False, **kwargs: Any) -> None:
+            self._file = sys.stderr if stderr else sys.stdout
+        def print(self, *args: Any, **kwargs: Any) -> None:
+            cleaned = []
+            for a in args:
+                s = str(a)
+                s = re.sub(r"\[/?(?:bold|dim|italic|underline|black|white|red|green|yellow|blue|magenta|cyan|[#0-9a-fA-F]+)(?:[^\]]*)\]", "", s)
+                cleaned.append(s)
+            print(*cleaned, file=self._file, **kwargs)
+        @contextmanager
+        def status(self, *args: Any, **kwargs: Any) -> Generator[None, None, None]:
+            yield None
+
+    console = Console()
+    err_console = Console(stderr=True)
+
+
+KEPLIX_ASCII_LOGO = (
+    "       ╭───╮   █  █  █▀▀▀  █▀▀█  █     ▀█▀  █  █\n"
+    "      ╱   ╱│   █▄▀   █▄▄   █▄▄█  █      █    ▀▄▀ \n"
+    "     ╭───╮ │   █  █  █▄▄▄  █     █▄▄▄  ▄█▄  █  █\n"
+    "     │   │ ╯\n"
+    "     ╰───╯     Your AI coding workforce, orchestrated."
+)
 
 
 def print_banner() -> None:
     """Print the Keplix mission control startup banner."""
     banner = (
-        "[bold cyan]🛰️  KEPLIX MISSION CONTROL[/bold cyan] "
-        "[dim]| Multi-Agent Orchestration Harness[/dim]\n"
-        "[dim italic]\"Keeping non-deterministic models locked in deterministic orbits\"[/dim italic]"
+        "[bold #c084fc]       ╭───╮[/bold #c084fc]   [bold #38bdf8]█  █  █▀▀▀  █▀▀█  █     ▀█▀  █  █[/bold #38bdf8]\n"
+        "[bold #c084fc]      ╱   ╱│[/bold #c084fc]   [bold #38bdf8]█▄▀   █▄▄   █▄▄█  █      █    ▀▄▀ [/bold #38bdf8]\n"
+        "[bold #c084fc]     ╭───╮ │[/bold #c084fc]   [bold #38bdf8]█  █  █▄▄▄  █     █▄▄▄  ▄█▄  █  █[/bold #38bdf8]\n"
+        "[bold #c084fc]     │   │ ╯[/bold #c084fc]\n"
+        "[bold #c084fc]     ╰───╯[/bold #c084fc]     [bold #38bdf8]MISSION CONTROL[/bold #38bdf8] [dim]| Multi-Agent Orchestration Harness[/dim]\n"
+        "               [dim italic]\"Keeping non-deterministic models locked in deterministic orbits\"[/dim italic]"
     )
-    console.print(Panel(banner, border_style="cyan", expand=False))
+    console.print(Panel(banner, border_style="#7e22ce", expand=False))
 
 
 @contextmanager
