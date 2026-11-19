@@ -1,2 +1,0 @@
-"""Keplix integration tests package."""
-
